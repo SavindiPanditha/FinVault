@@ -1,0 +1,14 @@
+<resources>
+    <style name="Theme.ImiliPocket" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary_color</item> <!-- Twilight Blue -->
+        <item name="colorPrimaryVariant">@color/primary_dark</item> <!-- Deep Blue -->
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/secondary_color</item> <!-- Aurora Pink -->
+        <item name="colorSecondaryVariant">@color/secondary_dark</item> <!-- Deep Pink -->
+        <item name="colorOnSecondary">@color/black</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+</resources>

@@ -1,0 +1,45 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Base gradient using 3 blue shades -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="45"
+                android:startColor="@color/primary_light"
+                android:centerColor="@color/primary_color"
+                android:endColor="@color/primary_dark"
+                android:type="linear" />
+        </shape>
+    </item>
+
+    <!-- Wave pattern 1 (softer contrast) -->
+    <item>
+        <rotate android:fromDegrees="-15"
+            android:pivotX="85%"
+            android:pivotY="15%">
+            <shape android:shape="rectangle">
+                <gradient
+                    android:angle="45"
+                    android:startColor="@color/white_alpha_20"
+                    android:endColor="@color/white_alpha_10"
+                    android:type="linear" />
+                <size android:height="160dp" />
+            </shape>
+        </rotate>
+    </item>
+
+    <!-- Wave pattern 2 (vertical accent) -->
+    <item>
+        <rotate android:fromDegrees="20"
+            android:pivotX="15%"
+            android:pivotY="90%">
+            <shape android:shape="rectangle">
+                <gradient
+                    android:angle="135"
+                    android:startColor="@color/primary_color_alpha_30"
+                    android:endColor="@color/primary_color_alpha_10"
+                    android:type="linear" />
+                <size android:height="200dp" />
+            </shape>
+        </rotate>
+    </item>
+</layer-list>

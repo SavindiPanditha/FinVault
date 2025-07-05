@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base Colors -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Primary Color Palette (Twilight Blue) -->
+    <color name="primary_color">#3F51B5</color>  <!-- Twilight Blue -->
+    <color name="primary_dark">#303F9F</color>   <!-- Deep Blue -->
+    <color name="primary_light">#C5CAE9</color>  <!-- Light Blue -->
+
+    <!-- Primary Color Alphas -->
+    <color name="primary_color_alpha_10">#1A3F51B5</color>
+    <color name="primary_color_alpha_30">#4D3F51B5</color>
+    <color name="primary_color_alpha_60">#993F51B5</color>
+
+    <!-- Secondary Color Palette (Aurora Pink) -->
+    <color name="secondary_color">#F06292</color>  <!-- Aurora Pink -->
+    <color name="secondary_dark">#C2185B</color>   <!-- Deep Pink -->
+    <color name="secondary_light">#FFCDD2</color>  <!-- Light Pink -->
+
+    <!-- Supporting Colors -->
+    <color name="income_green">#4CAF50</color>    <!-- Seafoam Green -->
+    <color name="expense_red">#EF5350</color>     <!-- Sunset Red -->
+    <color name="accent_yellow">#FFD740</color>   <!-- Starlight Yellow -->
+    <color name="accent_purple">#AB47BC</color>   <!-- Cosmic Purple -->
+
+    <!-- Supporting Color Alphas -->
+    <color name="income_green_alpha_10">#1A4CAF50</color>
+    <color name="expense_red_alpha_10">#1AEF5350</color>
+    <color name="expense_red_alpha_60">#99EF5350</color>
+
+    <!-- Neutrals -->
+    <color name="background">#E8ECEF</color>     <!-- Moonlit Gray -->
+    <color name="surface">#FFFFFF</color>        <!-- Cloud White -->
+    <color name="light_surface">#F5F7FA</color>  <!-- Light Gray (added for compatibility) -->
+    <color name="text_primary">#212121</color>    <!-- Night Slate -->
+    <color name="text_secondary">#78909C</color>  <!-- Mist Gray -->
+    <color name="dark_gray">#424242</color>      <!-- Dark Gray (added for compatibility) -->
+
+    <!-- White Alphas -->
+    <color name="white_alpha_05">#0DFFFFFF</color>
+    <color name="white_alpha_10">#1AFFFFFF</color>
+    <color name="white_alpha_20">#33FFFFFF</color>
+    <color name="white_alpha_60">#99FFFFFF</color>
+
+    <!-- Category Colors -->
+    <color name="colorFood">#F06292</color>       <!-- Aurora Pink -->
+    <color name="colorTransport">#4CAF50</color>  <!-- Seafoam Green -->
+    <color name="colorEntertainment">#AB47BC</color> <!-- Cosmic Purple -->
+    <color name="colorOthers">#FFD740</color>     <!-- Starlight Yellow -->
+
+    <!-- Chart Colors -->
+    <color name="chart_color1">#3F51B5</color>    <!-- Twilight Blue -->
+    <color name="chart_color2">#F06292</color>    <!-- Aurora Pink -->
+    <color name="chart_color3">#FFD740</color>    <!-- Starlight Yellow -->
+    <color name="chart_color4">#EF5350</color>    <!-- Sunset Red -->
+    <color name="chart_color5">#AB47BC</color>    <!-- Cosmic Purple -->
+
+    <color name="income_color1">#C8E6C9</color>   <!-- Light Seafoam -->
+    <color name="income_color2">#81C784</color>   <!-- Soft Seafoam -->
+    <color name="income_color3">#4CAF50</color>   <!-- Seafoam Green -->
+    <color name="income_color4">#388E3C</color>   <!-- Deep Seafoam -->
+    <color name="income_color5">#2E7D32</color>   <!-- Dark Seafoam -->
+
+    <color name="expense_color1">#FFCDD2</color>  <!-- Light Sunset -->
+    <color name="expense_color2">#EF9A9A</color>  <!-- Soft Sunset -->
+    <color name="expense_color3">#EF5350</color>  <!-- Sunset Red -->
+    <color name="expense_color4">#E53935</color>  <!-- Deep Sunset -->
+    <color name="expense_color5">#D32F2F</color>  <!-- Dark Sunset -->
+
+    <!-- Ripple and Outline -->
+    <color name="button_ripple">#33F06292</color>  <!-- Pink Ripple -->
+    <color name="outline_color">#3378909C</color>  <!-- Subtle Mist Outline -->
+
+    <!-- Drawable Colors -->
+    <color name="green_light">#C8E6C9</color>    <!-- Light Seafoam -->
+    <color name="green_dark">#2E7D32</color>     <!-- Dark Seafoam -->
+</resources>
