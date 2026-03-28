@@ -68,6 +68,7 @@ class TransactionsFragment : Fragment() {
                 }.collectLatest { (transactions, categories, currencies) ->
                     transactionAdapter.updateReferenceData(categories, currencies)
                     transactionAdapter.submitList(transactions)
+                    binding.rvTransactions.scheduleLayoutAnimation()
                 }
             }
         }

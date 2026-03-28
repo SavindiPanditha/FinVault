@@ -13,6 +13,7 @@ FinVault (ImiliPocket) is a comprehensive personal finance management applicatio
 - 🔔 Budget alerts and notifications
 - 📅 Scheduled transaction reminders
 - 🎯 Category-based expense tracking
+- 🔐 Email/password authentication with Supabase
 - 📱 Modern Material Design UI
 - 💾 Local data storage using Room Database
 - 🚀 Smooth onboarding experience
@@ -22,7 +23,8 @@ FinVault (ImiliPocket) is a comprehensive personal finance management applicatio
 - **Language:** Kotlin
 - **UI:** Android ViewBinding
 - **Database:** Room Persistence Library
-- **Architecture:** MVVM (presumed based on structure)
+- **Networking/Auth:** OkHttp + Supabase Auth REST API
+- **Architecture:** MVVM (ViewModel + Repository + DAO)
 - **Min SDK:** 24 (Android 7.0)
 - **Target SDK:** 35 (Android 15)
 
@@ -48,6 +50,15 @@ cd FinVault
 ./gradlew build
 ```
 
+### Configure Supabase (required for authentication)
+
+Add these values to `local.properties`:
+
+```properties
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
 ### Run the app
 
 1. Open the project in Android Studio
@@ -63,11 +74,14 @@ Key libraries used in this project:
 - Material Design Components
 - Room Database
 - Kotlin Coroutines (for async operations)
+- OkHttp
+- Gson
 
 ## 📱 Permissions
 
 The app requires the following permissions:
 
+- `INTERNET` - For Supabase authentication API requests
 - `POST_NOTIFICATIONS` - For budget alerts and reminders
 - `SCHEDULE_EXACT_ALARM` - For scheduled transaction notifications
 
@@ -78,6 +92,7 @@ app/
 ├── src/
 │   ├── main/
 │   │   ├── java/com/example/imilipocket/
+│   │   │   ├── auth/         # Supabase auth service and session management
 │   │   │   ├── data/         # Database and data models
 │   │   │   └── ui/           # Activities and UI components
 │   │   └── res/              # Resources (layouts, drawables, etc.)

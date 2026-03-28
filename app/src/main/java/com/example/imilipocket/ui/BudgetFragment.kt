@@ -150,6 +150,7 @@ class BudgetFragment : Fragment() {
                     binding.rvBudgets.adapter = budgetAdapter
                     budgetAdapter.setCategories(categories)
                     budgetAdapter.submitList(budgets)
+                    binding.rvBudgets.scheduleLayoutAnimation()
                 }
             }
         }
