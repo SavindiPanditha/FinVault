@@ -8,14 +8,18 @@ import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.imilipocket.databinding.FragmentBudgetBinding
 import com.example.imilipocket.model.BudgetEntity
+import com.example.imilipocket.model.CategoryEntity
 import com.example.imilipocket.model.TransactionType
 import com.example.imilipocket.ui.adapter.BudgetAdapter
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -27,6 +31,7 @@ class BudgetFragment : Fragment() {
     private val viewModel: FinanceViewModel by viewModels()
     private lateinit var budgetAdapter: BudgetAdapter
     private val calendar = Calendar.getInstance()
+    private var expenseCategories: List<CategoryEntity> = emptyList()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -58,13 +63,16 @@ class BudgetFragment : Fragment() {
     }
 
     private fun setupCategorySpinner() {
-        lifecycleScope.launch {
-            viewModel.getCategoriesByType(TransactionType.EXPENSE.name).collectLatest { categories ->
-                binding.spinnerBudgetCategory.adapter = ArrayAdapter(
-                    requireContext(), android.R.layout.simple_spinner_item,
-                    categories.map { it.name }
-                ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
-                budgetAdapter.setCategories(categories)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.getCategoriesByType(TransactionType.EXPENSE.name).collectLatest { categories ->
+                    expenseCategories = categories
+                    binding.spinnerBudgetCategory.adapter = ArrayAdapter(
+                        requireContext(), android.R.layout.simple_spinner_item,
+                        categories.map { it.name }
+                    ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+                    budgetAdapter.setCategories(categories)
+                }
             }
         }
     }
@@ -81,59 +89,68 @@ class BudgetFragment : Fragment() {
         }
 
         lifecycleScope.launch {
-            viewModel.getCategoriesByType(TransactionType.EXPENSE.name).collectLatest { categories ->
-                val index = binding.spinnerBudgetCategory.selectedItemPosition
-                if (index >= categories.size) {
-                    Toast.makeText(context, "Select a valid category", Toast.LENGTH_SHORT).show()
-                    return@collectLatest
-                }
-
-                val categoryId = categories[index].id
-                val month = calendar.get(Calendar.MONTH) + 1
-                val year = calendar.get(Calendar.YEAR)
-
-                viewModel.getBudgetByCategory(categoryId, month, year).collectLatest { existingBudget ->
-                    if (existingBudget != null) {
-                        Toast.makeText(context, "Budget already exists for this category and month", Toast.LENGTH_SHORT).show()
-                        return@collectLatest
-                    }
-
-                    viewModel.insertBudget(
-                        BudgetEntity(
-                            categoryId = categoryId,
-                            amount = amount,
-                            month = month,
-                            year = year
-                        )
-                    )
-                    binding.etBudgetAmount.text.clear()
-                }
+            val index = binding.spinnerBudgetCategory.selectedItemPosition
+            if (index < 0 || index >= expenseCategories.size) {
+                Toast.makeText(context, "Select a valid category", Toast.LENGTH_SHORT).show()
+                return@launch
             }
+
+            val categoryId = expenseCategories[index].id
+            val month = calendar.get(Calendar.MONTH) + 1
+            val year = calendar.get(Calendar.YEAR)
+
+            val existingBudget = viewModel.getBudgetByCategory(categoryId, month, year).first()
+            if (existingBudget != null) {
+                Toast.makeText(context, "Budget already exists for this category and month", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            viewModel.insertBudget(
+                BudgetEntity(
+                    categoryId = categoryId,
+                    amount = amount,
+                    month = month,
+                    year = year
+                )
+            )
+            binding.etBudgetAmount.text.clear()
         }
     }
 
     private fun observeData() {
-        lifecycleScope.launch {
-            viewModel.budgets.combine(viewModel.transactions) { budgets, transactions ->
-                Pair(budgets, transactions)
-            }.collectLatest { (budgets, transactions) ->
-                val spentAmounts = budgets.associate { budget ->
-                    val spent = transactions.filter {
-                        it.categoryId == budget.categoryId &&
-                                it.date.month + 1 == calendar.get(Calendar.MONTH) + 1 &&
-                                it.date.year + 1900 == calendar.get(Calendar.YEAR)
-                    }.sumOf { it.amount }
-                    budget.id to spent
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                combine(
+                    viewModel.budgets,
+                    viewModel.transactions,
+                    viewModel.getCategoriesByType(TransactionType.EXPENSE.name)
+                ) { budgets, transactions, categories ->
+                    Triple(budgets, transactions, categories)
+                }.collectLatest { (budgets, transactions, categories) ->
+                    val now = Calendar.getInstance()
+                    val currentMonth = now.get(Calendar.MONTH) + 1
+                    val currentYear = now.get(Calendar.YEAR)
+
+                    val spentAmounts = budgets.associate { budget ->
+                        val spent = transactions.filter { transaction ->
+                            val transactionCalendar = Calendar.getInstance().apply { time = transaction.date }
+                            transaction.categoryId == budget.categoryId &&
+                                transactionCalendar.get(Calendar.MONTH) + 1 == currentMonth &&
+                                transactionCalendar.get(Calendar.YEAR) == currentYear
+                        }.sumOf { it.amount }
+                        budget.id to spent
+                    }
+
+                    budgetAdapter = BudgetAdapter(
+                        onDelete = { budget -> viewModel.deleteBudget(budget) },
+                        currentMonth = currentMonth,
+                        currentYear = currentYear,
+                        spentAmounts = spentAmounts
+                    )
+                    binding.rvBudgets.adapter = budgetAdapter
+                    budgetAdapter.setCategories(categories)
+                    budgetAdapter.submitList(budgets)
                 }
-                budgetAdapter = BudgetAdapter(
-                    onDelete = { budget -> viewModel.deleteBudget(budget) },
-                    currentMonth = calendar.get(Calendar.MONTH) + 1,
-                    currentYear = calendar.get(Calendar.YEAR),
-                    spentAmounts = spentAmounts
-                )
-                binding.rvBudgets.adapter = budgetAdapter
-                setupCategorySpinner() // Re-apply categories
-                budgetAdapter.submitList(budgets)
             }
         }
     }

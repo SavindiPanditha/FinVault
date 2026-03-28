@@ -40,6 +40,10 @@ class FinanceRepository(
     fun getCategoriesByType(type: String): Flow<List<CategoryEntity>> = categoryDao.getByType(type)
 
     suspend fun initializeCategories() {
+        if (categoryDao.count() > 0) {
+            return
+        }
+
         listOf(
             CategoryEntity(name = "Salary", type = "INCOME"),
             CategoryEntity(name = "Food", type = "EXPENSE"),
@@ -53,9 +57,24 @@ class FinanceRepository(
 
     suspend fun insertCurrency(currency: CurrencyEntity) = currencyDao.insert(currency)
 
+    suspend fun setDefaultCurrency(code: String) {
+        val existing = currencyDao.getByCodeSync(code)
+        val currencyId = if (existing == null) {
+            currencyDao.insert(CurrencyEntity(code = code, isDefault = false)).toInt()
+        } else {
+            existing.id
+        }
+
+        currencyDao.deleteDuplicatesByCode(code, currencyId)
+        currencyDao.clearDefaultFlags()
+        currencyDao.setDefaultById(currencyId)
+    }
+
     fun getDefaultCurrency(): Flow<CurrencyEntity?> = currencyDao.getDefault()
 
     suspend fun getDefaultCurrencySync(): CurrencyEntity? = currencyDao.getDefaultSync()
+
+    suspend fun getFirstCurrencySync(): CurrencyEntity? = currencyDao.getFirstCurrencySync()
 
     suspend fun clearAllData() {
         transactionDao.deleteAll()

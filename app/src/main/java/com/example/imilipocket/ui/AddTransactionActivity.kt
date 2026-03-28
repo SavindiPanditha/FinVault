@@ -14,9 +14,11 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.imilipocket.R
+import com.example.imilipocket.model.CategoryEntity
 import com.example.imilipocket.model.TransactionEntity
 import com.example.imilipocket.model.TransactionType
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -36,6 +38,11 @@ class AddTransactionActivity : AppCompatActivity() {
     private val calendar = Calendar.getInstance()
     private var selectedDate: Date = calendar.time
     private var selectedType: TransactionType = TransactionType.EXPENSE // Default to Expense
+    private var selectedCurrencyId: Int = 1
+    private var categoriesForSelectedType: List<CategoryEntity> = emptyList()
+    private var editTransaction: TransactionEntity? = null
+    private var pendingCategoryId: Int? = null
+    private var refreshCategoriesJob: Job? = null
     private val TAG = "AddTransactionActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,7 +61,9 @@ class AddTransactionActivity : AppCompatActivity() {
 
         setupDatePicker()
         setupTypeRadioGroup()
-        setupCategorySpinner()
+        refreshCategorySpinner()
+        loadDefaultCurrency()
+        loadTransactionForEditIfNeeded()
         setupSaveButton()
     }
 
@@ -84,49 +93,78 @@ class AddTransactionActivity : AppCompatActivity() {
                 else -> TransactionType.EXPENSE // Fallback
             }
             Log.d(TAG, "Selected type: $selectedType")
-            setupCategorySpinner()
+            refreshCategorySpinner()
         }
         // Set initial selection
         radioExpense.isChecked = true
     }
 
-    private fun setupCategorySpinner() {
-        lifecycleScope.launch {
-            viewModel.getCategoriesByType(selectedType.name).collectLatest { categories ->
-                Log.d(TAG, "Categories for $selectedType: ${categories.map { it.name }}")
-                spinnerCategory.adapter = ArrayAdapter(
-                    this@AddTransactionActivity,
-                    android.R.layout.simple_spinner_item,
-                    categories.map { it.name }
-                ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
-                if (categories.isEmpty()) {
-                    spinnerCategory.isEnabled = false
-                    btnSave.isEnabled = false
-                    Toast.makeText(
-                        this@AddTransactionActivity,
-                        "No categories available for $selectedType. Initializing categories...",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    viewModel.initializeCategories()
-                    // Retry fetching categories
-                    viewModel.getCategoriesByType(selectedType.name).collectLatest { retryCategories ->
-                        Log.d(TAG, "Retry categories for $selectedType: ${retryCategories.map { it.name }}")
-                        spinnerCategory.adapter = ArrayAdapter(
-                            this@AddTransactionActivity,
-                            android.R.layout.simple_spinner_item,
-                            retryCategories.map { it.name }
-                        ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
-                        if (retryCategories.isNotEmpty()) {
-                            spinnerCategory.isEnabled = true
-                            btnSave.isEnabled = true
-                            spinnerCategory.setSelection(0)
-                        }
-                    }
-                } else {
-                    spinnerCategory.isEnabled = true
-                    btnSave.isEnabled = true
-                    spinnerCategory.setSelection(0)
+    private fun refreshCategorySpinner() {
+        refreshCategoriesJob?.cancel()
+        refreshCategoriesJob = lifecycleScope.launch {
+            var categories = viewModel.getCategoriesByType(selectedType.name).first()
+            if (categories.isEmpty()) {
+                spinnerCategory.isEnabled = false
+                btnSave.isEnabled = false
+                viewModel.initializeCategories()
+                categories = viewModel.getCategoriesByType(selectedType.name).first()
+            }
+
+            categoriesForSelectedType = categories
+            Log.d(TAG, "Categories for $selectedType: ${categories.map { it.name }}")
+
+            spinnerCategory.adapter = ArrayAdapter(
+                this@AddTransactionActivity,
+                android.R.layout.simple_spinner_item,
+                categories.map { it.name }
+            ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+
+            spinnerCategory.isEnabled = categories.isNotEmpty()
+            btnSave.isEnabled = categories.isNotEmpty()
+
+            val categoryId = pendingCategoryId
+            if (categoryId != null) {
+                val selectedIndex = categories.indexOfFirst { it.id == categoryId }
+                if (selectedIndex >= 0) {
+                    spinnerCategory.setSelection(selectedIndex)
                 }
+                pendingCategoryId = null
+            } else if (categories.isNotEmpty()) {
+                spinnerCategory.setSelection(0)
+            }
+        }
+    }
+
+    private fun loadDefaultCurrency() {
+        lifecycleScope.launch {
+            selectedCurrencyId = viewModel.getDefaultCurrencyId()
+        }
+    }
+
+    private fun loadTransactionForEditIfNeeded() {
+        val transactionId = intent.getIntExtra("TRANSACTION_ID", -1)
+        if (transactionId <= 0) {
+            return
+        }
+
+        lifecycleScope.launch {
+            val transaction = viewModel.getTransactionById(transactionId).first()
+            if (transaction == null) {
+                Toast.makeText(this@AddTransactionActivity, "Transaction not found", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            editTransaction = transaction
+            etAmount.setText(transaction.amount.toString())
+            etNote.setText(transaction.note.orEmpty())
+            selectedDate = transaction.date
+            etDate.setText(SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(selectedDate))
+            selectedCurrencyId = transaction.currencyId
+            pendingCategoryId = transaction.categoryId
+
+            when (transaction.type) {
+                TransactionType.INCOME -> radioIncome.isChecked = true
+                TransactionType.EXPENSE -> radioExpense.isChecked = true
             }
         }
     }
@@ -139,26 +177,50 @@ class AddTransactionActivity : AppCompatActivity() {
                     Toast.makeText(this@AddTransactionActivity, "Enter a valid amount", Toast.LENGTH_SHORT).show()
                     return@launch
                 }
-                viewModel.getCategoriesByType(selectedType.name).collectLatest { categories ->
-                    val index = spinnerCategory.selectedItemPosition
-                    if (index < 0 || index >= categories.size) {
-                        Toast.makeText(this@AddTransactionActivity, "Select a valid category", Toast.LENGTH_SHORT).show()
-                        return@collectLatest
-                    }
-                    val transaction = TransactionEntity(
-                        amount = amount,
-                        type = selectedType,
-                        categoryId = categories[index].id,
-                        date = selectedDate,
-                        note = etNote.text.toString(),
-                        currencyId = 1 // Default to LKR
-                    )
+
+                if (selectedDate.after(Date())) {
+                    Toast.makeText(this@AddTransactionActivity, "Date cannot be in the future", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                val note = etNote.text.toString().trim()
+                if (note.length > 200) {
+                    Toast.makeText(this@AddTransactionActivity, "Note must be 200 characters or less", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                val index = spinnerCategory.selectedItemPosition
+                if (index < 0 || index >= categoriesForSelectedType.size) {
+                    Toast.makeText(this@AddTransactionActivity, "Select a valid category", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                val transaction = TransactionEntity(
+                    id = editTransaction?.id ?: 0,
+                    amount = amount,
+                    type = selectedType,
+                    categoryId = categoriesForSelectedType[index].id,
+                    date = selectedDate,
+                    note = note,
+                    currencyId = selectedCurrencyId
+                )
+
+                if (editTransaction == null) {
                     Log.d(TAG, "Inserting transaction: $transaction")
                     viewModel.insertTransaction(transaction)
-                    setResult(RESULT_OK)
-                    finish()
+                } else {
+                    Log.d(TAG, "Updating transaction: $transaction")
+                    viewModel.updateTransaction(transaction)
                 }
+
+                setResult(RESULT_OK)
+                finish()
             }
         }
+    }
+
+    override fun onDestroy() {
+        refreshCategoriesJob?.cancel()
+        super.onDestroy()
     }
 }

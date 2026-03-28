@@ -3,9 +3,11 @@ package com.example.imilipocket.work
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.imilipocket.R
@@ -13,6 +15,16 @@ import com.example.imilipocket.R
 class ExpenseReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         createNotificationChannel()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                applicationContext,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return Result.success()
+        }
+
         val notification = NotificationCompat.Builder(applicationContext, "budget_channel")
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Daily Expense Reminder")

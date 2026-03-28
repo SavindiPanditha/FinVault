@@ -17,11 +17,11 @@ import com.example.imilipocket.model.TransactionType
 import com.example.imilipocket.work.ExpenseReminderWorker
 import com.example.imilipocket.work.ReminderWorker
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Date
 import java.util.concurrent.TimeUnit
@@ -50,7 +50,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         // Initialize categories and default currency
         viewModelScope.launch {
             initializeCategories()
-            getDefaultCurrency()
+            ensureDefaultCurrency()
         }
     }
 
@@ -123,11 +123,11 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun getDefaultCurrency() = viewModelScope.launch {
+    private suspend fun ensureDefaultCurrency() {
         try {
             val currency = repository.getDefaultCurrencySync()
             if (currency == null) {
-                repository.insertCurrency(CurrencyEntity(code = "LKR", isDefault = true))
+                repository.setDefaultCurrency("LKR")
             }
         } catch (e: Exception) {
             _errorMessage.value = "Failed to get default currency: ${e.message}"
@@ -138,17 +138,22 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     fun saveCurrency(code: String) = viewModelScope.launch {
         try {
-            currencies.collect { currencyList ->
-                currencyList.forEach { currency ->
-                    if (currency.isDefault) {
-                        repository.insertCurrency(currency.copy(isDefault = false))
-                    }
-                }
+            if (code.isBlank()) {
+                _errorMessage.value = "Currency code cannot be empty"
+                return@launch
             }
-            repository.insertCurrency(CurrencyEntity(code = code, isDefault = true))
+            repository.setDefaultCurrency(code)
+            _errorMessage.value = "Currency set to $code"
         } catch (e: Exception) {
             _errorMessage.value = "Failed to save currency: ${e.message}"
         }
+    }
+
+    suspend fun getDefaultCurrencyId(): Int {
+        ensureDefaultCurrency()
+        return repository.getDefaultCurrencySync()?.id
+            ?: repository.getFirstCurrencySync()?.id
+            ?: throw IllegalStateException("No currency available")
     }
 
     fun getCategoriesByType(type: String): Flow<List<CategoryEntity>> = repository.getCategoriesByType(type)
@@ -162,30 +167,28 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun exportData(): String {
+    suspend fun exportData(): String {
         val data = mutableMapOf<String, Any>()
-        viewModelScope.launch {
-            transactions.collect { transactionList ->
-                data["transactions"] = transactionList.map {
-                    mapOf(
-                        "id" to it.id,
-                        "amount" to it.amount,
-                        "type" to it.type.name,
-                        "categoryId" to it.categoryId,
-                        "date" to it.date.time,
-                        "note" to (it.note ?: ""),
-                        "currencyId" to it.currencyId
-                    )
-                }
-            }
-            budgets.collect { data["budgets"] = it }
-            categories.collect { data["categories"] = it }
-            currencies.collect { data["currencies"] = it }
+
+        data["transactions"] = transactions.first().map {
+            mapOf(
+                "id" to it.id,
+                "amount" to it.amount,
+                "type" to it.type.name,
+                "categoryId" to it.categoryId,
+                "date" to it.date.time,
+                "note" to (it.note ?: ""),
+                "currencyId" to it.currencyId
+            )
         }
+        data["budgets"] = budgets.first()
+        data["categories"] = categories.first()
+        data["currencies"] = currencies.first()
+
         return Gson().toJson(data)
     }
 
-    fun exportDataToFile(context: Context): String {
+    suspend fun exportDataToFile(context: Context): String {
         try {
             val json = exportData()
             context.openFileOutput("finance_backup.json", Context.MODE_PRIVATE).use {
@@ -200,47 +203,54 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     fun restoreData(json: String) = viewModelScope.launch {
         try {
-            val type = object : TypeToken<Map<String, Any>>() {}.type
-            val data: Map<String, Any> = Gson().fromJson(json, type)
-            (data["transactions"] as? List<Map<String, Any>>)?.forEach { t ->
+            val data = Gson().fromJson(json, com.google.gson.JsonObject::class.java)
+
+            data.getAsJsonArray("transactions")?.forEach { tElement ->
+                val t = tElement.asJsonObject
                 repository.insertTransaction(
                     TransactionEntity(
-                        id = (t["id"] as? Double)?.toInt() ?: 0,
-                        amount = (t["amount"] as? Double) ?: 0.0,
-                        type = t["type"]?.let { TransactionType.valueOf(it as String) } ?: TransactionType.EXPENSE,
-                        categoryId = (t["categoryId"] as? Double)?.toInt() ?: 0,
-                        date = t["date"]?.let { Date((it as Double).toLong()) } ?: Date(),
-                        note = t["note"] as? String,
-                        currencyId = (t["currencyId"] as? Double)?.toInt() ?: 0
+                        id = t.get("id")?.asInt ?: 0,
+                        amount = t.get("amount")?.asDouble ?: 0.0,
+                        type = t.get("type")?.asString?.let { TransactionType.valueOf(it) } ?: TransactionType.EXPENSE,
+                        categoryId = t.get("categoryId")?.asInt ?: 0,
+                        date = t.get("date")?.asLong?.let { Date(it) } ?: Date(),
+                        note = if (t.has("note") && !t.get("note").isJsonNull) t.get("note").asString else null,
+                        currencyId = t.get("currencyId")?.asInt ?: 0
                     )
                 )
             }
-            (data["budgets"] as? List<Map<String, Any>>)?.forEach { b ->
+
+            data.getAsJsonArray("budgets")?.forEach { bElement ->
+                val b = bElement.asJsonObject
                 repository.insertBudget(
                     BudgetEntity(
-                        id = (b["id"] as? Double)?.toInt() ?: 0,
-                        categoryId = (b["categoryId"] as? Double)?.toInt() ?: 0,
-                        amount = (b["amount"] as? Double) ?: 0.0,
-                        month = (b["month"] as? Double)?.toInt() ?: 0,
-                        year = (b["year"] as? Double)?.toInt() ?: 0
+                        id = b.get("id")?.asInt ?: 0,
+                        categoryId = b.get("categoryId")?.asInt ?: 0,
+                        amount = b.get("amount")?.asDouble ?: 0.0,
+                        month = b.get("month")?.asInt ?: 0,
+                        year = b.get("year")?.asInt ?: 0
                     )
                 )
             }
-            (data["categories"] as? List<Map<String, Any>>)?.forEach { c ->
+
+            data.getAsJsonArray("categories")?.forEach { cElement ->
+                val c = cElement.asJsonObject
                 repository.insertCategory(
                     CategoryEntity(
-                        id = (c["id"] as? Double)?.toInt() ?: 0,
-                        name = c["name"] as? String ?: "",
-                        type = c["type"] as? String ?: "EXPENSE"
+                        id = c.get("id")?.asInt ?: 0,
+                        name = c.get("name")?.asString ?: "",
+                        type = c.get("type")?.asString ?: "EXPENSE"
                     )
                 )
             }
-            (data["currencies"] as? List<Map<String, Any>>)?.forEach { c ->
+
+            data.getAsJsonArray("currencies")?.forEach { cElement ->
+                val c = cElement.asJsonObject
                 repository.insertCurrency(
                     CurrencyEntity(
-                        id = (c["id"] as? Double)?.toInt() ?: 0,
-                        code = c["code"] as? String ?: "",
-                        isDefault = c["isDefault"] as? Boolean ?: false
+                        id = c.get("id")?.asInt ?: 0,
+                        code = c.get("code")?.asString ?: "",
+                        isDefault = c.get("isDefault")?.asBoolean ?: false
                     )
                 )
             }
@@ -259,8 +269,9 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun scheduleDailyReminder() {
+        val budgetDelay = calculateInitialDelayHours(targetHour = 20)
         val budgetRequest = PeriodicWorkRequestBuilder<ReminderWorker>(1, TimeUnit.DAYS)
-            .setInitialDelay(20 - System.currentTimeMillis() / (1000 * 60 * 60) % 24, TimeUnit.HOURS)
+            .setInitialDelay(budgetDelay, TimeUnit.HOURS)
             .build()
         WorkManager.getInstance(getApplication()).enqueueUniquePeriodicWork(
             "daily_budget_reminder",
@@ -268,13 +279,31 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             budgetRequest
         )
 
+        val expenseDelay = calculateInitialDelayHours(targetHour = 18)
         val expenseRequest = PeriodicWorkRequestBuilder<ExpenseReminderWorker>(1, TimeUnit.DAYS)
-            .setInitialDelay(18 - System.currentTimeMillis() / (1000 * 60 * 60) % 24, TimeUnit.HOURS)
+            .setInitialDelay(expenseDelay, TimeUnit.HOURS)
             .build()
         WorkManager.getInstance(getApplication()).enqueueUniquePeriodicWork(
             "daily_expense_reminder",
             ExistingPeriodicWorkPolicy.KEEP,
             expenseRequest
         )
+    }
+
+    private fun calculateInitialDelayHours(targetHour: Int): Long {
+        val now = java.util.Calendar.getInstance()
+        val next = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+            set(java.util.Calendar.HOUR_OF_DAY, targetHour)
+            if (before(now)) {
+                add(java.util.Calendar.DAY_OF_YEAR, 1)
+            }
+        }
+
+        val diffMillis = next.timeInMillis - now.timeInMillis
+        val diffHours = java.util.concurrent.TimeUnit.MILLISECONDS.toHours(diffMillis)
+        return if (diffHours <= 0L) 1L else diffHours
     }
 }

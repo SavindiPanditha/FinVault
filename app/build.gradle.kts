@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.androidx.room)
 }
 
+import java.util.Properties
+
 android {
     namespace = "com.example.imilipocket"
     compileSdk = 35
@@ -17,6 +19,23 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val localProps = Properties().apply {
+            val localFile = rootProject.file("local.properties")
+            if (localFile.exists()) {
+                localFile.inputStream().use { load(it) }
+            }
+        }
+
+        val supabaseUrl = localProps.getProperty("SUPABASE_URL")
+            ?: (project.findProperty("SUPABASE_URL") as String?)
+            ?: ""
+        val supabaseAnonKey = localProps.getProperty("SUPABASE_ANON_KEY")
+            ?: (project.findProperty("SUPABASE_ANON_KEY") as String?)
+            ?: ""
+
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
     }
 
     buildTypes {
@@ -38,6 +57,7 @@ android {
         jvmTarget = "11"
     }
     buildFeatures {
+        buildConfig = true
         viewBinding = true
     }
     room {
@@ -83,6 +103,7 @@ dependencies {
 
     // ViewPager2 for Onboarding
     implementation(libs.androidx.viewpager2)
+    implementation(libs.okhttp)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -90,7 +111,9 @@ dependencies {
 }
 
 tasks.register<org.gradle.api.tasks.Delete>("cleanResources") {
-    delete(project.fileTree(mapOf("dir" to "$buildDir", "include" to listOf("**/*.class", "**/*.dex", "**/*.ap_"))))
+    delete(project.layout.buildDirectory.asFileTree.matching {
+        include("**/*.class", "**/*.dex", "**/*.ap_")
+    })
 }
 
 tasks.named<org.gradle.api.Task>("preBuild") {

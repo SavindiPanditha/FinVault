@@ -17,6 +17,9 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE type = :type")
     fun getByType(type: String): Flow<List<CategoryEntity>>
 
+    @Query("SELECT COUNT(*) FROM categories")
+    suspend fun count(): Int
+
     @Query("DELETE FROM categories")
     suspend fun deleteAll()
 }

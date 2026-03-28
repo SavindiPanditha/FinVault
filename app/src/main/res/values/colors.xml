@@ -76,4 +76,10 @@
     <!-- Drawable Colors -->
     <color name="green_light">#C8E6C9</color>    <!-- Light Seafoam -->
     <color name="green_dark">#2E7D32</color>     <!-- Dark Seafoam -->
+
+    <!-- Modern Surface Tokens -->
+    <color name="surface_soft">#FFF6F8FD</color>
+    <color name="surface_outline">#1A000000</color>
+    <color name="income_strong">#1B8A4B</color>
+    <color name="expense_strong">#D95140</color>
 </resources>

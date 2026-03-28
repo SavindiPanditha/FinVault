@@ -3,9 +3,11 @@ package com.example.imilipocket.work
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.imilipocket.R
@@ -36,7 +38,13 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
         budgets.forEach { budget ->
             if (budget.month == month && budget.year == year) {
                 val expenses = transactions
-                    .filter { it.type == TransactionType.EXPENSE && it.categoryId == budget.categoryId }
+                    .filter {
+                        if (it.type != TransactionType.EXPENSE || it.categoryId != budget.categoryId) {
+                            return@filter false
+                        }
+                        val txDate = Calendar.getInstance().apply { time = it.date }
+                        txDate.get(Calendar.MONTH) + 1 == month && txDate.get(Calendar.YEAR) == year
+                    }
                     .sumOf { it.amount }
                 val category = categories.find { it.id == budget.categoryId }
                 if (expenses >= budget.amount * 0.8 && expenses < budget.amount) {
@@ -77,6 +85,15 @@ class ReminderWorker(appContext: Context, params: WorkerParameters) : CoroutineW
     }
 
     private fun sendNotification(categoryId: Int, categoryName: String, expenses: Double, budget: Double, title: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                applicationContext,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+
         val notification = NotificationCompat.Builder(applicationContext, "budget_channel")
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)

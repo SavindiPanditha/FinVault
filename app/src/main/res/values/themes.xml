@@ -10,5 +10,18 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowBackground">@drawable/bg_screen_modern</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.ImiliPocket.Medium</item>
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.ImiliPocket.Small</item>
+    </style>
+
+    <style name="ShapeAppearance.ImiliPocket.Medium" parent="ShapeAppearance.MaterialComponents.MediumComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">20dp</item>
+    </style>
+
+    <style name="ShapeAppearance.ImiliPocket.Small" parent="ShapeAppearance.MaterialComponents.SmallComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">14dp</item>
     </style>
 </resources>

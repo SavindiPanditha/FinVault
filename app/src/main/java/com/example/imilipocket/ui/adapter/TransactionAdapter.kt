@@ -13,9 +13,18 @@ import java.util.Locale
 class TransactionAdapter(
     private val onEdit: (TransactionEntity) -> Unit,
     private val onDelete: (TransactionEntity) -> Unit,
-    private val categories: List<com.example.imilipocket.model.CategoryEntity>,
-    private val currencies: List<com.example.imilipocket.model.CurrencyEntity>
+    private var categories: List<com.example.imilipocket.model.CategoryEntity>,
+    private var currencies: List<com.example.imilipocket.model.CurrencyEntity>
 ) : ListAdapter<TransactionEntity, TransactionAdapter.TransactionViewHolder>(TransactionDiffCallback()) {
+
+    fun updateReferenceData(
+        categories: List<com.example.imilipocket.model.CategoryEntity>,
+        currencies: List<com.example.imilipocket.model.CurrencyEntity>
+    ) {
+        this.categories = categories
+        this.currencies = currencies
+        notifyDataSetChanged()
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TransactionViewHolder {
         val binding = ItemTransactionBinding.inflate(LayoutInflater.from(parent.context), parent, false)
